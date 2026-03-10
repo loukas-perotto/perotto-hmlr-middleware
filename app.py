@@ -95,7 +95,7 @@ xmlns:oc="http://www.landregistry.gov.uk/OfficialCopyTitleKnown/V2_1">
 """
 
     response = requests.post(
-        "https://bgtest.landregistry.gov.uk/bgsoapengine",
+        "https://bgtest.landregistry.gov.uk/bgtest/services/OfficialCopyTitleKnownV2_1",
         data=soap_xml,
         headers={"Content-Type": "text/xml"},
         cert=cert_path,

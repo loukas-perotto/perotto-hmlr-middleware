@@ -36,11 +36,11 @@ def bgtest_check():
         ca_path = ca_file.name
 
     response = requests.get(
-        "https://bgtest.landregistry.gov.uk",
-        cert=cert_path,
-        verify=ca_path,
-        timeout=20
-    )
+    "https://bgtest.landregistry.gov.uk/b2b/BGSoapEngine/OfficialCopyTitleKnownV2_1WebService?wsdl",
+    cert=cert_path,
+    verify=ca_path,
+    timeout=30
+)
 
     return jsonify({
         "status": "ok",

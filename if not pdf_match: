@@ -195,10 +195,11 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 )
 
         if not pdf_match:
-            return jsonify({
-                "status": "error",
-                "message": "PDF not found in HMLR response"
-            }), 500
+    return jsonify({
+        "status": "error",
+        "message": "PDF not found in HMLR response",
+        "xml_preview": xml[:2000]
+    }), 500
 
         pdf_base64 = pdf_match.group(1).strip()
         pdf_bytes = base64.b64decode(pdf_base64)

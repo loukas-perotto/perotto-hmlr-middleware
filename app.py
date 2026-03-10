@@ -6,14 +6,13 @@ import requests
 
 app = Flask(__name__)
 
+# Hardcode the Google Cloud project ID for simplicity
+PROJECT_ID = "perotto-hmlr"
+
 
 def get_secret(secret_id: str) -> str:
-    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT") or os.environ.get("GCP_PROJECT")
-    if not project_id:
-        raise RuntimeError("Google Cloud project ID not found in environment.")
-
     client = secretmanager.SecretManagerServiceClient()
-    name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
+    name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
     response = client.access_secret_version(request={"name": name})
     return response.payload.data.decode("utf-8")
 
@@ -35,9 +34,6 @@ def order():
 
 @app.route("/bgtest-check", methods=["GET"])
 def bgtest_check():
-    cert_pem = None
-    ca_chain_pem = None
-
     try:
         cert_pem = get_secret("bgtest-client-cert")
         ca_chain_pem = get_secret("bgtest-ca-chain")

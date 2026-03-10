@@ -165,11 +165,14 @@ xmlns:int="http://www.landregistry.gov.uk/international">
         blob = bucket.blob(filename)
         blob.upload_from_string(pdf_bytes, content_type="application/pdf")
 
-        signed_url = blob.generate_signed_url(
-            version="v4",
-            expiration=timedelta(hours=1),
-            method="GET"
-        )
+        return jsonify({
+    "status": "success",
+    "title_number": title_number,
+    "bucket": BUCKET_NAME,
+    "object_name": filename,
+    "gcs_uri": f"gs://{BUCKET_NAME}/{filename}",
+    "pdf_url": f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
+})
 
         return jsonify({
             "status": "success",

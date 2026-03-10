@@ -1,13 +1,17 @@
 from flask import Flask, jsonify
 from google.cloud import secretmanager
+from google.cloud import storage
 import tempfile
 import requests
 import os
 import time
+import base64
+import re
 
 app = Flask(__name__)
 
 PROJECT_ID = "perotto-hmlr"
+BUCKET_NAME = "perotto-hmlr-documents"
 
 
 def get_secret(secret_id: str) -> str:
@@ -19,11 +23,13 @@ def get_secret(secret_id: str) -> str:
 
 @app.route("/", methods=["GET"])
 def hello():
-    return "HMLR middleware v7 running"
+    return "HMLR middleware running"
 
 
-@app.route("/official-copy-test", methods=["GET"])
-def official_copy_test():
+@app.route("/official-copy", methods=["GET"])
+def official_copy():
+
+    title_number = "ST500681"
 
     cert_pem = get_secret("bgtest-client-cert")
     ca_chain_pem = get_secret("bgtest-ca-chain")
@@ -38,8 +44,6 @@ def official_copy_test():
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as ca_file:
         ca_file.write(ca_chain_pem)
         ca_path = ca_file.name
-
-    title_number = "ND66318"
 
     message_id = f"DfltMsgId{int(time.time()*1000)}"
 
@@ -143,10 +147,31 @@ xmlns:int="http://www.landregistry.gov.uk/international">
             timeout=30
         )
 
+        xml = response.text
+
+        pdf_match = re.search(r"<ns4:EmbeddedFileBinaryObject[^>]*>(.*?)</ns4:EmbeddedFileBinaryObject>", xml)
+
+        if not pdf_match:
+            return jsonify({"status": "error", "message": "PDF not found"})
+
+        pdf_base64 = pdf_match.group(1)
+
+        pdf_bytes = base64.b64decode(pdf_base64)
+
+        filename = f"{title_number}-{int(time.time())}.pdf"
+
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blob = bucket.blob(filename)
+
+        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
+
+        blob.make_public()
+
         return jsonify({
-            "status": "ok",
-            "http_status": response.status_code,
-            "response_xml": response.text[:2000]
+            "status": "success",
+            "title_number": title_number,
+            "pdf_url": blob.public_url
         })
 
     finally:

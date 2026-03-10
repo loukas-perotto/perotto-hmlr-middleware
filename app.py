@@ -190,9 +190,8 @@ xmlns:int="http://www.landregistry.gov.uk/international">
         xml = response.text
 
         pdf_match = re.search(
-    r"<.*EmbeddedFileBinaryObject[^>]*>(.*?)</.*EmbeddedFileBinaryObject>",
-    xml,
-    re.DOTALL
+    r"(JVBERi0[0-9A-Za-z+/=\s]+)",
+    xml
 )
 
         if not pdf_match:

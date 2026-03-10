@@ -15,7 +15,7 @@ BUCKET_NAME = "perotto-hmlr-documents"
 
 
 # -----------------------------
-# SECRET MANAGER HELPER
+# SECRET HELPER
 # -----------------------------
 
 def get_secret(secret_id):
@@ -35,7 +35,7 @@ def home():
 
 
 # -----------------------------
-# DOWNLOAD DOCUMENT FROM BUCKET
+# SERVE PDF FROM STORAGE
 # -----------------------------
 
 @app.route("/document/<filename>", methods=["GET"])
@@ -60,7 +60,7 @@ def serve_document(filename):
 
 
 # -----------------------------
-# REQUEST OFFICIAL COPY
+# REQUEST OFFICE COPY
 # -----------------------------
 
 @app.route("/official-copy", methods=["GET"])
@@ -88,8 +88,7 @@ def official_copy():
 
         message_id = f"DfltMsgId{int(time.time()*1000)}"
 
-        soap_xml = f"""
-<?xml version="1.0" encoding="UTF-8"?>
+        soap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 
 <soapenv:Envelope
 xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -189,17 +188,19 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 
         xml = response.text
 
-        pdf_match = re.search(
-    r"(JVBERi0[0-9A-Za-z+/=\s]+)",
-    xml
-)
+        # -----------------------------
+        # EXTRACT BASE64 PDF
+        # -----------------------------
+
+        pdf_match = re.search(r"(JVBERi0[0-9A-Za-z+/=\s]+)", xml)
 
         if not pdf_match:
-    return jsonify({
-        "status": "error",
-        "message": "PDF not found in HMLR response",
-        "xml_preview": xml[:2000]
-    }), 500
+
+            return jsonify({
+                "status": "error",
+                "message": "PDF not found in HMLR response",
+                "xml_preview": xml[:2000]
+            }), 500
 
         pdf_base64 = pdf_match.group(1).strip()
         pdf_bytes = base64.b64decode(pdf_base64)

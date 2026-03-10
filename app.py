@@ -1,13 +1,12 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, Response
 from google.cloud import secretmanager
 from google.cloud import storage
-import tempfile
 import requests
+import tempfile
 import os
-import time
 import base64
 import re
-from datetime import timedelta
+import time
 
 app = Flask(__name__)
 
@@ -15,30 +14,69 @@ PROJECT_ID = "perotto-hmlr"
 BUCKET_NAME = "perotto-hmlr-documents"
 
 
-def get_secret(secret_id: str) -> str:
+# -----------------------------
+# SECRET MANAGER HELPER
+# -----------------------------
+
+def get_secret(secret_id):
     client = secretmanager.SecretManagerServiceClient()
     name = f"projects/{PROJECT_ID}/secrets/{secret_id}/versions/latest"
     response = client.access_secret_version(request={"name": name})
     return response.payload.data.decode("utf-8")
 
 
+# -----------------------------
+# HEALTH CHECK
+# -----------------------------
+
 @app.route("/", methods=["GET"])
-def hello():
+def home():
     return "HMLR middleware running"
 
 
+# -----------------------------
+# DOWNLOAD DOCUMENT FROM BUCKET
+# -----------------------------
+
+@app.route("/document/<filename>", methods=["GET"])
+def serve_document(filename):
+
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(BUCKET_NAME)
+    blob = bucket.blob(filename)
+
+    if not blob.exists():
+        return {"error": "File not found"}, 404
+
+    pdf_bytes = blob.download_as_bytes()
+
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
+        headers={
+            "Content-Disposition": f'inline; filename="{filename}"'
+        }
+    )
+
+
+# -----------------------------
+# REQUEST OFFICIAL COPY
+# -----------------------------
+
 @app.route("/official-copy", methods=["GET"])
 def official_copy():
-    title_number = "ST500681"
+
+    title_number = request.args.get("title_number", "ST500681")
 
     cert_path = None
     ca_path = None
 
     try:
+
         cert_pem = get_secret("bgtest-client-cert")
         ca_chain_pem = get_secret("bgtest-ca-chain")
-        bg_username = get_secret("bg-username")
-        bg_password = get_secret("bg-password")
+        username = get_secret("bg-username")
+        password = get_secret("bg-password")
 
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as cert_file:
             cert_file.write(cert_pem)
@@ -50,7 +88,8 @@ def official_copy():
 
         message_id = f"DfltMsgId{int(time.time()*1000)}"
 
-        soap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+        soap_xml = f"""
+<?xml version="1.0" encoding="UTF-8"?>
 
 <soapenv:Envelope
 xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -63,8 +102,8 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 
 <wsse:Security>
 <wsse:UsernameToken>
-<wsse:Username>{bg_username}</wsse:Username>
-<wsse:Password>{bg_password}</wsse:Password>
+<wsse:Username>{username}</wsse:Username>
+<wsse:Password>{password}</wsse:Password>
 </wsse:UsernameToken>
 </wsse:Security>
 
@@ -110,14 +149,23 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 </ns1:Contact>
 
 <ns1:TitleKnownOfficialCopy>
+
 <ns1:RequestedOfficialCopyCode>10</ns1:RequestedOfficialCopyCode>
+
 <ns1:PropertyDescription>Test Property</ns1:PropertyDescription>
+
 <ns1:OfficialCopyTypeCode>10</ns1:OfficialCopyTypeCode>
+
 <ns1:ContinueIfTitleIsClosedAndContinuedIndicator>false</ns1:ContinueIfTitleIsClosedAndContinuedIndicator>
+
 <ns1:NotifyIfPendingFirstRegistrationIndicator>false</ns1:NotifyIfPendingFirstRegistrationIndicator>
+
 <ns1:NotifyIfPendingApplicationIndicator>false</ns1:NotifyIfPendingApplicationIndicator>
+
 <ns1:SendBackDatedIndicator>false</ns1:SendBackDatedIndicator>
+
 <ns1:ContinueIfActualFeeExceedsExpectedFeeIndicator>true</ns1:ContinueIfActualFeeExceedsExpectedFeeIndicator>
+
 </ns1:TitleKnownOfficialCopy>
 
 </ns1:Product>
@@ -150,9 +198,7 @@ xmlns:int="http://www.landregistry.gov.uk/international">
         if not pdf_match:
             return jsonify({
                 "status": "error",
-                "stage": "parse_pdf",
-                "message": "PDF not found in HMLR response",
-                "response_xml_preview": xml[:1500]
+                "message": "PDF not found in HMLR response"
             }), 500
 
         pdf_base64 = pdf_match.group(1).strip()
@@ -163,40 +209,37 @@ xmlns:int="http://www.landregistry.gov.uk/international">
         storage_client = storage.Client()
         bucket = storage_client.bucket(BUCKET_NAME)
         blob = bucket.blob(filename)
-        blob.upload_from_string(pdf_bytes, content_type="application/pdf")
 
-        return jsonify({
-    "status": "success",
-    "title_number": title_number,
-    "bucket": BUCKET_NAME,
-    "object_name": filename,
-    "gcs_uri": f"gs://{BUCKET_NAME}/{filename}",
-    "pdf_url": f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
-})
+        blob.upload_from_string(
+            pdf_bytes,
+            content_type="application/pdf"
+        )
+
+        url = f"https://perotto-hmlr-middleware-804049538982.europe-west1.run.app/document/{filename}"
 
         return jsonify({
             "status": "success",
             "title_number": title_number,
-            "bucket": BUCKET_NAME,
-            "object_name": filename,
-            "gcs_uri": f"gs://{BUCKET_NAME}/{filename}",
-            "signed_url": signed_url
+            "pdf_url": url
         })
 
     except Exception as e:
+
         return jsonify({
             "status": "error",
-            "stage": "official_copy",
             "message": str(e)
         }), 500
 
     finally:
+
         try:
             if cert_path and os.path.exists(cert_path):
                 os.remove(cert_path)
+
             if ca_path and os.path.exists(ca_path):
                 os.remove(ca_path)
-        except Exception:
+
+        except:
             pass
 
 

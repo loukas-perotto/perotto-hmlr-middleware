@@ -1,8 +1,8 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 from google.cloud import secretmanager
-import os
 import tempfile
 import requests
+import os
 
 app = Flask(__name__)
 
@@ -18,40 +18,7 @@ def get_secret(secret_id: str) -> str:
 
 @app.route("/", methods=["GET"])
 def hello():
-    return "HMLR middleware v2 is running"
-
-
-@app.route("/bgtest-check", methods=["GET"])
-def bgtest_check():
-
-    cert_pem = get_secret("bgtest-client-cert")
-    ca_chain_pem = get_secret("bgtest-ca-chain")
-
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as cert_file:
-        cert_file.write(cert_pem)
-        cert_path = cert_file.name
-
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as ca_file:
-        ca_file.write(ca_chain_pem)
-        ca_path = ca_file.name
-
-    try:
-        response = requests.get(
-            "https://bgtest.landregistry.gov.uk",
-            cert=cert_path,
-            verify=ca_path,
-            timeout=20
-        )
-
-        return jsonify({
-            "status": "ok",
-            "http_status": response.status_code,
-            "body_preview": response.text[:500]
-        })
-
-    finally:
-        os.remove(cert_path)
-        os.remove(ca_path)
+    return "HMLR middleware v4 running"
 
 
 @app.route("/official-copy-test", methods=["GET"])
@@ -60,6 +27,9 @@ def official_copy_test():
     cert_pem = get_secret("bgtest-client-cert")
     ca_chain_pem = get_secret("bgtest-ca-chain")
 
+    bg_username = get_secret("bg-username")
+    bg_password = get_secret("bg-password")
+
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as cert_file:
         cert_file.write(cert_pem)
         cert_path = cert_file.name
@@ -68,13 +38,31 @@ def official_copy_test():
         ca_file.write(ca_chain_pem)
         ca_path = ca_file.name
 
-    # Example vendor test title number
     title_number = "ND66318"
 
     soap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-xmlns:oc="http://www.landregistry.gov.uk/OfficialCopyTitleKnown/V2_1">
-<soapenv:Header/>
+
+<soapenv:Envelope
+xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+xmlns:oc="http://www.landregistry.gov.uk/OfficialCopyTitleKnown/V2_1"
+xmlns:wsse="http://schemas.xmlsoap.org/ws/2002/12/secext"
+xmlns:int="http://www.landregistry.gov.uk/international">
+
+<soapenv:Header>
+
+<wsse:Security>
+<wsse:UsernameToken>
+<wsse:Username>{bg_username}</wsse:Username>
+<wsse:Password>{bg_password}</wsse:Password>
+</wsse:UsernameToken>
+</wsse:Security>
+
+<int:International>
+<int:Locale>en</int:Locale>
+</int:International>
+
+</soapenv:Header>
+
 <soapenv:Body>
 
 <oc:OfficialCopyTitleKnownRequest>
@@ -86,11 +74,8 @@ xmlns:oc="http://www.landregistry.gov.uk/OfficialCopyTitleKnown/V2_1">
 
 <oc:Application>
 <oc:TitleNumber>{title_number}</oc:TitleNumber>
-
 <oc:OfficialCopyTypeCode>10</oc:OfficialCopyTypeCode>
-
 <oc:CustomerReference>TESTREF1</oc:CustomerReference>
-
 </oc:Application>
 
 </oc:OfficialCopyTitleKnownRequest>

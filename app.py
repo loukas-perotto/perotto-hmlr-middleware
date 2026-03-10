@@ -18,7 +18,7 @@ def get_secret(secret_id: str) -> str:
 
 @app.route("/", methods=["GET"])
 def hello():
-    return "HMLR middleware v4 running"
+    return "HMLR middleware v5 running"
 
 
 @app.route("/official-copy-test", methods=["GET"])
@@ -44,7 +44,7 @@ def official_copy_test():
 
 <soapenv:Envelope
 xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-xmlns:oc="http://www.landregistry.gov.uk/OfficialCopyTitleKnown/V2_1"
+xmlns:lr="http://www.oscre.org/ns/eReg-Final/2011"
 xmlns:wsse="http://schemas.xmlsoap.org/ws/2002/12/secext"
 xmlns:int="http://www.landregistry.gov.uk/international">
 
@@ -65,20 +65,17 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 
 <soapenv:Body>
 
-<oc:OfficialCopyTitleKnownRequest>
+<lr:RequestTitleKnownOfficialCopyV2_1>
 
-<oc:MessageHeader>
-<oc:MessageId>TEST123</oc:MessageId>
-<oc:Timestamp>2026-03-10T12:00:00</oc:Timestamp>
-</oc:MessageHeader>
+<lr:ID>TEST123</lr:ID>
 
-<oc:Application>
-<oc:TitleNumber>{title_number}</oc:TitleNumber>
-<oc:OfficialCopyTypeCode>10</oc:OfficialCopyTypeCode>
-<oc:CustomerReference>TESTREF1</oc:CustomerReference>
-</oc:Application>
+<lr:TitleNumber>{title_number}</lr:TitleNumber>
 
-</oc:OfficialCopyTitleKnownRequest>
+<lr:OfficialCopyTypeCode>10</lr:OfficialCopyTypeCode>
+
+<lr:CustomerReference>TESTREF1</lr:CustomerReference>
+
+</lr:RequestTitleKnownOfficialCopyV2_1>
 
 </soapenv:Body>
 </soapenv:Envelope>

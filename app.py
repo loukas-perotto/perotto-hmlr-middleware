@@ -3,6 +3,7 @@ from google.cloud import secretmanager
 import tempfile
 import requests
 import os
+import time
 
 app = Flask(__name__)
 
@@ -18,7 +19,7 @@ def get_secret(secret_id: str) -> str:
 
 @app.route("/", methods=["GET"])
 def hello():
-    return "HMLR middleware v6 running"
+    return "HMLR middleware v7 running"
 
 
 @app.route("/official-copy-test", methods=["GET"])
@@ -40,11 +41,14 @@ def official_copy_test():
 
     title_number = "ND66318"
 
+    message_id = f"DfltMsgId{int(time.time()*1000)}"
+
     soap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 
 <soapenv:Envelope
 xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-xmlns:oc1="http://www.oscre.org/ns/eReg-Final/2011/RequestTitleKnownOfficialCopyV2_1"
+xmlns:ns1="http://www.oscre.org/ns/eReg-Final/2011/RequestTitleKnownOfficialCopyV2_1"
+xmlns:ns3="http://officialcopyv2_1.ws.bg.lr.gov/"
 xmlns:wsse="http://schemas.xmlsoap.org/ws/2002/12/secext"
 xmlns:int="http://www.landregistry.gov.uk/international">
 
@@ -65,17 +69,64 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 
 <soapenv:Body>
 
-<oc1:RequestTitleKnownOfficialCopyV2_1>
+<ns3:performTitleKnownSearch>
 
-<oc1:ID>TEST123</oc1:ID>
+<arg0>
 
-<oc1:TitleNumber>{title_number}</oc1:TitleNumber>
+<ns1:ID>
+<ns1:MessageID>{message_id}</ns1:MessageID>
+</ns1:ID>
 
-<oc1:OfficialCopyTypeCode>10</oc1:OfficialCopyTypeCode>
+<ns1:Product>
 
-<oc1:CustomerReference>TESTREF1</oc1:CustomerReference>
+<ns1:ExternalReference>
+<ns1:Reference>extRef0001</ns1:Reference>
+</ns1:ExternalReference>
 
-</oc1:RequestTitleKnownOfficialCopyV2_1>
+<ns1:CustomerReference>
+<ns1:Reference>custRef0001</ns1:Reference>
+</ns1:CustomerReference>
+
+<ns1:SubjectProperty>
+<ns1:TitleNumber>{title_number}</ns1:TitleNumber>
+</ns1:SubjectProperty>
+
+<ns1:ExpectedPrice>
+<ns1:GrossPriceAmount>10</ns1:GrossPriceAmount>
+</ns1:ExpectedPrice>
+
+<ns1:Contact>
+<ns1:Name>Test User</ns1:Name>
+<ns1:Communication>
+<ns1:Telephone>0123456789</ns1:Telephone>
+</ns1:Communication>
+</ns1:Contact>
+
+<ns1:TitleKnownOfficialCopy>
+
+<ns1:RequestedOfficialCopyCode>10</ns1:RequestedOfficialCopyCode>
+
+<ns1:PropertyDescription>Test Property</ns1:PropertyDescription>
+
+<ns1:OfficialCopyTypeCode>10</ns1:OfficialCopyTypeCode>
+
+<ns1:ContinueIfTitleIsClosedAndContinuedIndicator>false</ns1:ContinueIfTitleIsClosedAndContinuedIndicator>
+
+<ns1:NotifyIfPendingFirstRegistrationIndicator>false</ns1:NotifyIfPendingFirstRegistrationIndicator>
+
+<ns1:NotifyIfPendingApplicationIndicator>false</ns1:NotifyIfPendingApplicationIndicator>
+
+<ns1:SendBackDatedIndicator>false</ns1:SendBackDatedIndicator>
+
+<ns1:ContinueIfActualFeeExceedsExpectedFeeIndicator>true</ns1:ContinueIfActualFeeExceedsExpectedFeeIndicator>
+
+</ns1:TitleKnownOfficialCopy>
+
+</ns1:Product>
+
+</arg0>
+
+</ns3:performTitleKnownSearch>
 
 </soapenv:Body>
 </soapenv:Envelope>

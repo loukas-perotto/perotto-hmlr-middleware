@@ -190,10 +190,10 @@ xmlns:int="http://www.landregistry.gov.uk/international">
         xml = response.text
 
         pdf_match = re.search(
-            r"<ns4:EmbeddedFileBinaryObject[^>]*>(.*?)</ns4:EmbeddedFileBinaryObject>",
-            xml,
-            re.DOTALL
-        )
+    r"<.*EmbeddedFileBinaryObject[^>]*>(.*?)</.*EmbeddedFileBinaryObject>",
+    xml,
+    re.DOTALL
+)
 
         if not pdf_match:
             return jsonify({

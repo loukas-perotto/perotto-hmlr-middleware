@@ -31,23 +31,26 @@ def official_copy():
 
     title_number = "ST500681"
 
-    cert_pem = get_secret("bgtest-client-cert")
-    ca_chain_pem = get_secret("bgtest-ca-chain")
+    cert_path = None
+    ca_path = None
 
-    bg_username = get_secret("bg-username")
-    bg_password = get_secret("bg-password")
+    try:
+        cert_pem = get_secret("bgtest-client-cert")
+        ca_chain_pem = get_secret("bgtest-ca-chain")
+        bg_username = get_secret("bg-username")
+        bg_password = get_secret("bg-password")
 
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as cert_file:
-        cert_file.write(cert_pem)
-        cert_path = cert_file.name
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as cert_file:
+            cert_file.write(cert_pem)
+            cert_path = cert_file.name
 
-    with tempfile.NamedTemporaryFile(mode="w", delete=False) as ca_file:
-        ca_file.write(ca_chain_pem)
-        ca_path = ca_file.name
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as ca_file:
+            ca_file.write(ca_chain_pem)
+            ca_path = ca_file.name
 
-    message_id = f"DfltMsgId{int(time.time()*1000)}"
+        message_id = f"DfltMsgId{int(time.time()*1000)}"
 
-    soap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+        soap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 
 <soapenv:Envelope
 xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -107,23 +110,14 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 </ns1:Contact>
 
 <ns1:TitleKnownOfficialCopy>
-
 <ns1:RequestedOfficialCopyCode>10</ns1:RequestedOfficialCopyCode>
-
 <ns1:PropertyDescription>Test Property</ns1:PropertyDescription>
-
 <ns1:OfficialCopyTypeCode>10</ns1:OfficialCopyTypeCode>
-
 <ns1:ContinueIfTitleIsClosedAndContinuedIndicator>false</ns1:ContinueIfTitleIsClosedAndContinuedIndicator>
-
 <ns1:NotifyIfPendingFirstRegistrationIndicator>false</ns1:NotifyIfPendingFirstRegistrationIndicator>
-
 <ns1:NotifyIfPendingApplicationIndicator>false</ns1:NotifyIfPendingApplicationIndicator>
-
 <ns1:SendBackDatedIndicator>false</ns1:SendBackDatedIndicator>
-
 <ns1:ContinueIfActualFeeExceedsExpectedFeeIndicator>true</ns1:ContinueIfActualFeeExceedsExpectedFeeIndicator>
-
 </ns1:TitleKnownOfficialCopy>
 
 </ns1:Product>
@@ -136,8 +130,6 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 </soapenv:Envelope>
 """
 
-    try:
-
         response = requests.post(
             "https://bgtest.landregistry.gov.uk/b2b/ECBG_StubService/OfficialCopyTitleKnownV2_1WebService",
             data=soap_xml,
@@ -149,13 +141,21 @@ xmlns:int="http://www.landregistry.gov.uk/international">
 
         xml = response.text
 
-        pdf_match = re.search(r"<ns4:EmbeddedFileBinaryObject[^>]*>(.*?)</ns4:EmbeddedFileBinaryObject>", xml)
+        pdf_match = re.search(
+            r"<ns4:EmbeddedFileBinaryObject[^>]*>(.*?)</ns4:EmbeddedFileBinaryObject>",
+            xml,
+            re.DOTALL
+        )
 
         if not pdf_match:
-            return jsonify({"status": "error", "message": "PDF not found"})
+            return jsonify({
+                "status": "error",
+                "stage": "parse_pdf",
+                "message": "PDF not found in HMLR response",
+                "response_xml_preview": xml[:1500]
+            }), 500
 
-        pdf_base64 = pdf_match.group(1)
-
+        pdf_base64 = pdf_match.group(1).strip()
         pdf_bytes = base64.b64decode(pdf_base64)
 
         filename = f"{title_number}-{int(time.time())}.pdf"
@@ -163,20 +163,32 @@ xmlns:int="http://www.landregistry.gov.uk/international">
         storage_client = storage.Client()
         bucket = storage_client.bucket(BUCKET_NAME)
         blob = bucket.blob(filename)
-
         blob.upload_from_string(pdf_bytes, content_type="application/pdf")
-
-        blob.make_public()
 
         return jsonify({
             "status": "success",
             "title_number": title_number,
-            "pdf_url": blob.public_url
+            "bucket": BUCKET_NAME,
+            "object_name": filename,
+            "gcs_uri": f"gs://{BUCKET_NAME}/{filename}",
+            "https_url": f"https://storage.googleapis.com/{BUCKET_NAME}/{filename}"
         })
 
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "stage": "official_copy",
+            "message": str(e)
+        }), 500
+
     finally:
-        os.remove(cert_path)
-        os.remove(ca_path)
+        try:
+            if cert_path and os.path.exists(cert_path):
+                os.remove(cert_path)
+            if ca_path and os.path.exists(ca_path):
+                os.remove(ca_path)
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

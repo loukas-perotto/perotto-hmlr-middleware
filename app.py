@@ -35,18 +35,23 @@ def bgtest_check():
         ca_file.write(ca_chain_pem)
         ca_path = ca_file.name
 
-    response = requests.get(
-    "https://bgtest.landregistry.gov.uk/b2b/BGSoapEngine/OfficialCopyTitleKnownV2_1WebService?wsdl",
-    cert=cert_path,
-    verify=ca_path,
-    timeout=30
-)
+    try:
+        response = requests.get(
+            "https://bgtest.landregistry.gov.uk",
+            cert=cert_path,
+            verify=ca_path,
+            timeout=20
+        )
 
-    return jsonify({
-        "status": "ok",
-        "http_status": response.status_code,
-        "body_preview": response.text[:500]
-    })
+        return jsonify({
+            "status": "ok",
+            "http_status": response.status_code,
+            "body_preview": response.text[:500]
+        })
+
+    finally:
+        os.remove(cert_path)
+        os.remove(ca_path)
 
 
 @app.route("/official-copy-test", methods=["GET"])
@@ -63,7 +68,7 @@ def official_copy_test():
         ca_file.write(ca_chain_pem)
         ca_path = ca_file.name
 
-    # TEST TITLE NUMBER FROM HMLR VENDOR TEST DATA
+    # Example vendor test title number
     title_number = "ND66318"
 
     soap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
@@ -75,7 +80,7 @@ xmlns:oc="http://www.landregistry.gov.uk/OfficialCopyTitleKnown/V2_1">
 <oc:OfficialCopyTitleKnownRequest>
 
 <oc:MessageHeader>
-<oc:MessageId>test123</oc:MessageId>
+<oc:MessageId>TEST123</oc:MessageId>
 <oc:Timestamp>2026-03-10T12:00:00</oc:Timestamp>
 </oc:MessageHeader>
 
@@ -94,20 +99,26 @@ xmlns:oc="http://www.landregistry.gov.uk/OfficialCopyTitleKnown/V2_1">
 </soapenv:Envelope>
 """
 
-    response = requests.post(
-        "https://bgtest.landregistry.gov.uk/b2b/BGSoapEngine/services/OfficialCopyTitleKnownV2_1WebService",
-        data=soap_xml,
-        headers={"Content-Type": "text/xml"},
-        cert=cert_path,
-        verify=ca_path,
-        timeout=30
-    )
+    try:
 
-    return jsonify({
-        "status": "ok",
-        "http_status": response.status_code,
-        "response_xml": response.text[:2000]
-    })
+        response = requests.post(
+            "https://bgtest.landregistry.gov.uk/b2b/ECBG_StubService/OfficialCopyTitleKnownV2_1WebService",
+            data=soap_xml,
+            headers={"Content-Type": "text/xml"},
+            cert=cert_path,
+            verify=ca_path,
+            timeout=30
+        )
+
+        return jsonify({
+            "status": "ok",
+            "http_status": response.status_code,
+            "response_xml": response.text[:2000]
+        })
+
+    finally:
+        os.remove(cert_path)
+        os.remove(ca_path)
 
 
 if __name__ == "__main__":

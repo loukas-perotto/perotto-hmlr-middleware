@@ -20,7 +20,7 @@ def get_secret(secret_id: str) -> str:
 
 @app.route("/", methods=["GET"])
 def hello():
-    return "HMLR middleware is running"
+    return "HMLR middleware v2 is running"
 
 
 @app.route("/order", methods=["POST"])

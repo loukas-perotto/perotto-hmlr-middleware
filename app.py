@@ -9,7 +9,7 @@ from google.cloud import secretmanager
 
 app = Flask(__name__)
 
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
+PROJECT_ID = "perotto-hmlr"
 CERT_SECRET = "bgtest-client-cert"
 CA_SECRET = "bgtest-ca-chain"
 
